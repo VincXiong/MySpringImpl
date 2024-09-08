@@ -65,6 +65,7 @@ public class AOPHelper {
 	public static void init() throws Exception {
 		Set<Class<?>> aspectClassSet = ClassSetHelper.getClassSetByAnnotation(Aspect.class);
 		for(Class<?> aspectClass : aspectClassSet) {
+			// Pointcut：切点，提供 ClassFilter 类过滤器和 MethodMatcher 方法匹配器支持对类和方法进行筛选。
 			Map<String, String> pointcuts = new HashedMap<>();
 			Object aspect = aspectClass.getDeclaredConstructor().newInstance();
 			for(Method method:aspectClass.getMethods()) {

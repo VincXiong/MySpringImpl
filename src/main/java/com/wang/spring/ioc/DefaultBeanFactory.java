@@ -214,17 +214,18 @@ public class DefaultBeanFactory implements BeanFactory{
 			throw new Exception("不存在 "+beanName+" 的定义");
 		}
 		Class<?> beanClass = beanDefinition.getBeanClass();
-		//找到实现类
+		// 如果 beanClass 是接口或者有多个实现类，则通过 findImplementClass 查找实际的实现类。
 		beanClass = findImplementClass(beanClass,null);
-		//判断是否需要代理，若需要则生成代理类
+		// 检查是否需要为该类生成代理。如果 BeanDefinition 中配置了代理，则生成代理类，并通过 myProxy.getProxy() 创建代理对象。
 		if(beanDefinition.getIsProxy() && beanDefinition.getProxy()!=null) {
 			MyProxy myProxy = beanDefinition.getProxy();
 			bean=myProxy.getProxy(beanClass);
 		}
 		else {
+			// 如果不需要代理，则通过反射创建该类的实例。
 			bean = beanClass.getDeclaredConstructor().newInstance();
 		}
-		//将实例化后，但未注入属性的bean，放入三级缓存中
+		//将实例化后，但未注入属性的bean，放入三级缓存中,用于解决循环依赖问题
 		final Object temp = bean;
 		singletonFactories.put(beanName, new ObjectFactory() {
 			@Override
@@ -233,14 +234,14 @@ public class DefaultBeanFactory implements BeanFactory{
 				return temp;
 			}
 		});
-		//反射调用init方法
+		// 如果 Bean 定义中有指定的初始化方法，使用反射调用该方法对 Bean 进行初始化操作
 		String initMethodName = beanDefinition.getInitMethodName();
 		if(initMethodName!=null) {
 			Method method = beanClass.getMethod(initMethodName, null);
 			method.invoke(bean, null);
 		}
 		
-		//注入bean的属性
+		// 对 Bean 的属性进行依赖注入
 		fieldInject(beanClass, bean, false);
 		//如果三级缓存存在bean，则拿出放入二级缓存中
 		if(singletonFactories.containsKey(beanName)) {
@@ -284,14 +285,17 @@ public class DefaultBeanFactory implements BeanFactory{
 	/**
 	 * 依赖注入
 	 * @param beanClass
-	 * @param instance
+	 * @param bean
 	 * @param isProxyed
 	 * @throws Exception
+	 * @implNote 方法用于依赖注入，将带有特定注解（如 @Value、@Autowired 或 @Resource）的字段注入相应的值或实例
 	 */
+
 	private void fieldInject(Class<?> beanClass, Object bean, boolean isProxyed) throws Exception{
         Field[] beanFields = beanClass.getDeclaredFields();
         if (beanFields != null && beanFields.length > 0) {
             for (Field beanField : beanFields) {
+				// 注入 @Value 注解的字段
             	if(beanField.isAnnotationPresent(Value.class)) {
             		//注入value值
             		String key = beanField.getAnnotation(Value.class).value();
@@ -319,14 +323,18 @@ public class DefaultBeanFactory implements BeanFactory{
             			else {
 							throw new RuntimeException("不允许的类型");
 						}
+						// 使用反射将获取到的值注入到该字段中。
             			beanField.setAccessible(true);
             			beanField.set(bean, value);
             		}
             	}
                 //找Autowired/Resource注解属性
+				// 注入 @Autowired 和 @Resource 注解的字段
             	else if (beanField.isAnnotationPresent(Autowired.class) || beanField.isAnnotationPresent(Resource.class)) {
-                    Class<?> beanFieldClass = beanField.getType();
+                    // 获取字段的类型，并初始化 qualifier 为 null，以用于后续的 @Qualifier 注解处理。
+					Class<?> beanFieldClass = beanField.getType();
                     String qualifier = null;
+					// @Autowired 注解处理
                     if(beanField.isAnnotationPresent(Autowired.class)) {
                     	if(beanField.isAnnotationPresent(Qualifier.class)) {
                         	qualifier=beanField.getAnnotation(Qualifier.class).value();
@@ -334,6 +342,7 @@ public class DefaultBeanFactory implements BeanFactory{
                         //Service找实现
                         beanFieldClass = findImplementClass(beanFieldClass,qualifier);
                     }
+					// @Resource 注解处理
                     else if(beanField.isAnnotationPresent(Resource.class)){
                     	qualifier = beanField.getAnnotation(Resource.class).name();
                     	if(qualifier==null || qualifier.equals("")) {
@@ -365,18 +374,26 @@ public class DefaultBeanFactory implements BeanFactory{
                 }
             }
         }
-
     }
 	
 	/**
 	 * 找到实现类
 	 * @param interfaceClass
 	 * @return
+	 * @implNote 主要逻辑：
+	 * 该方法根据接口类或父类以及名称，在所有类中查找实现类或子类。
+	 * 如果提供了名称，则优先匹配注解名称或者类名。
+	 * 如果找到了多个实现类，返回找到的第一个类。
+	 * 步骤：
+	 * 如果接口类不为空，查找所有实现类，并根据名称进行精确匹配。
+	 * 如果接口类为空，则通过名称进行查找，匹配注解名称或类名。
+	 * 最终返回找到的第一个实现类。
 	 */
 	private static Class<?> findImplementClass(Class<?> interfaceClass,String name){
 		Class<?> implementClass = interfaceClass;
 		Set<Class<?>> classSet = new HashSet<>();
 		for(Class<?> cls : ClassSetHelper.getClassSet()) {
+			// 判断当前类 cls 是否是接口类或父类 interfaceClass 的实现类或子类
 			if(interfaceClass!=null && interfaceClass.isAssignableFrom(cls) && !interfaceClass.equals(cls)) {
 				if(name!=null && !name.equals("")) {
 					if(isClassAnnotationedName(cls, name)) {
@@ -387,6 +404,7 @@ public class DefaultBeanFactory implements BeanFactory{
 			}
 			else if(interfaceClass==null) {
 				if(name!=null && !name.equals("")) {
+					// 如果类上存在与 name 匹配的注解，或者类名与 name 匹配并且该类不是接口，立即返回该类。
 					if(isClassAnnotationedName(cls, name) || (cls.getSimpleName().equals(name) && !cls.isInterface())) {
 						return cls;
 					}
@@ -398,6 +416,7 @@ public class DefaultBeanFactory implements BeanFactory{
 		}
 		return implementClass;
 	}
+	// 判断一个类是否有某些特定注解（如 @Component、@Service、@Controller），并且这些注解的 value 值是否与给定的 name 匹配
 	private static boolean isClassAnnotationedName(Class<?> cls,String name) {
 		return (cls.isAnnotationPresent(Component.class) && cls.getAnnotation(Component.class).value().equals(name)) ||
 				(cls.isAnnotationPresent(Service.class) && cls.getAnnotation(Service.class).value().equals(name)) ||

@@ -28,7 +28,7 @@ public class TomcatServer {
     	}
         //设置绑定的ip及端口号
         tomcat.setHostname("localhost");
-        tomcat.setPort(8080);
+        tomcat.setPort(9888);
         final Context context = tomcat.addContext("/", null);
         Tomcat.addServlet(context, "dispatch", new DispatcherServlet());
         context.addServletMapping("/", "dispatch");

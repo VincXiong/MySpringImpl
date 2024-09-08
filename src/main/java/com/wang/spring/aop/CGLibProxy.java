@@ -16,7 +16,7 @@ import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
 /**
- * 使用CGLib实现的代理类，对目标进行增强
+ * 使用CGLib实现的代理类，对目标进行增强，CGLIB 动态代理则是基于类代理（字节码提升），通过 ASM（Java 字节码的操作和分析框架）将被代理类的 class 文件加载进来，通过修改其字节码生成子类来处理
  * @author Administrator
  *
  */
@@ -33,17 +33,22 @@ public class CGLibProxy implements MethodInterceptor,MyProxy{
 	/**
 	 * 通过CGLib库生成代理类
 	 * @param cls
-	 * @return
+	 * @implNote  Enhancer：来指定要代理的目标对象，实际处理代理逻辑的对象，最终通过调用create（）方法得到代理对象、对这个对象所有的非final方法的调用都会转发给MethodInterceptor
 	 */
 	@Override
 	public Object getProxy(Class<?> cls) {
+		// 创建cglib的增强对象
 		Enhancer enhancer = new Enhancer();
+		// 指定父类，也就是被代理的类
 		enhancer.setSuperclass(cls);
+		// 指定回掉接口
 		enhancer.setCallback(this);
+		// 理解为创建一个目标类的子类
 		return enhancer.create();
 	}
 	/**
 	 * 拦截目标代理方法，对目标方法进行增强
+	 * MethodInterceptor：动态代理对象的方法调用都会转发到intercept方法进行增强
 	 */
 	@Override
 	public Object intercept(Object object, Method method, Object[] arg2, MethodProxy methodProxy) throws Throwable {

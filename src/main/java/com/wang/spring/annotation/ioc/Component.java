@@ -11,5 +11,6 @@ import java.lang.annotation.Target;
 @Retention(RUNTIME)
 @Target(TYPE)
 public @interface Component {
+	// 定义的bean取名
 	String value() default "";
 }

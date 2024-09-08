@@ -48,6 +48,9 @@ public final class ClassUtil {
       Set<Class<?>> classSet = new HashSet<Class<?>>();
       try {
           Enumeration<URL> urls = getClassLoader().getResources(packageName.replace(".", "/"));
+          //遍历资源路径 urls，判断每个 URL 的协议类型：
+          //file 协议：表示该资源在文件系统中，调用 addClass 方法处理文件系统中的类。
+          //jar 协议：表示该资源在 JAR 文件中，使用 JarURLConnection 处理 JAR 文件中的类。
           while (urls.hasMoreElements()) {
               URL url = urls.nextElement();
               if (url != null) {
@@ -94,12 +97,14 @@ public final class ClassUtil {
       for (File file : files) {
           String fileName = file.getName();
           if (file.isFile()) {
+              // 处理类文件
               String className = fileName.substring(0, fileName.lastIndexOf("."));
               if (packageName != null && packageName != "") {
                   className = packageName + "." + className;
               }
               doAddClass(classSet, className);
           } else {
+              // 处理目录
               String subPackagePath = fileName;
               if (packagePath != null && packagePath != "") {
                   subPackagePath = packagePath + "/" + subPackagePath;
